@@ -91,3 +91,67 @@ const fileFilter = (req, file, cb) => {
   cb(ok ? null : new Error('Invalid file type'), ok);
 };
 const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
+
+// Product detail
+app.get('/product/:id', async (req, res) => {
+  const [rows] = await db.query('SELECT * FROM products WHERE id = ?', [req.params.id]);
+  if (!rows[0]) return res.status(404).send('Product not found');
+  const productRaw = rows[0];
+  const resolvePath = (img) => {
+    const placeholder = '/images/placeholder.png';
+    if (!img || typeof img !== 'string') return placeholder;
+    const normalized = img.startsWith('/') ? img : ('/' + img);
+    const candidate = path.join(__dirname, 'public', normalized.replace(/^\//, ''));
+    if (fs.existsSync(candidate)) return normalized;
+    if (normalized.startsWith('/images/')) {
+      const base = path.basename(normalized);
+      const alt = path.join(__dirname, 'public', 'uploads', base);
+      if (fs.existsSync(alt)) return '/uploads/' + base;
+    }
+    return placeholder;
+  };
+  const product = { ...productRaw, imageResolved: resolvePath(productRaw.image) };
+  let reviews = [];
+  try {
+    const [rows] = await db.query('SELECT r.*, u.username FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = ?', [product.id]);
+    reviews = rows;
+  } catch (err) {
+    reviews = [];
+  }
+  res.render('product', { product, reviews, cartCount: res.locals.cartCount });
+});
+
+// Register
+app.get('/register', (req, res) => res.render('register'));
+app.post('/register', async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) return res.redirect('/register');
+  const [exists] = await db.query('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
+  if (exists.length) return res.send('User already exists');
+  await db.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, password, 'customer']);
+  res.redirect('/login');
+});
+
+// Login
+app.get('/login', (req, res) => {
+  const error = req.session.authError || null;
+  req.session.authError = null;
+  const username = req.query.u || '';
+  res.render('login', { error, username });
+});
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  const [rows] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+  const user = rows[0];
+  if (!user || user.password !== password) {
+    req.session.authError = 'Username atau password salah';
+    return res.redirect('/login?u=' + encodeURIComponent(username || ''));
+  }
+  req.session.user = { id: user.id, username: user.username, role: user.role };
+  res.redirect('/');
+});
+
+// Logout
+app.post('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/'));
+});
