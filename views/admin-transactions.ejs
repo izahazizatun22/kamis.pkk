@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Transactions</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="/images/logo.png" type="image/png" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo">SPICE DUMS</div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/admin/reports">Reports</a>
+      <a href="/admin/products">Products</a>
+      <a href="/admin/transactions">Transactions</a>
+    </nav>
+    <div class="auth">
+      <% if (user) { %>
+        <span>Hi <%= user.username %> <span class="badge">ADMIN</span></span>
+        <form method="post" action="/logout" style="display:inline"><button type="submit" class="btn" style="padding:8px 14px; margin-top:0;">Logout</button></form>
+      <% } %>
+    </div>
+  </header>
+  <main class="container">
+    <h2 class="section-title">Transactions</h2>
+
+    <form method="get" style="margin: 12px 0; display: flex; gap: 8px; align-items: center;">
+      <input name="q" value="<%= q || '' %>" placeholder="Search ID, User, Product" class="input" style="padding:8px 12px; flex:1;" />
+      <button type="submit" class="btn" style="max-width:220px;">Search</button>
+      <a href="/admin/transactions" class="btn btn-sm" style="width:auto;">Reset</a>
+    </form>
+
+    <table class="report-table">
+      <thead><tr><th>ID</th><th>User</th><th>Items</th><th>Total</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody>
+        <% (sales || []).forEach(s => { %>
+          <tr>
+            <td><%= s.id %></td>
+            <td><%= s.username %></td>
+            <td>
+              <% if (Array.isArray(s.items) && s.items.length) { %>
+                <%= s.items.map(it => it.name + ' x' + Number(it.qty)).join(', ') %>
+              <% } else { %>
+                -
+              <% } %>
+            </td>
+            <td>Rp <%= Number(s.total).toLocaleString('id-ID') %></td>
+            <td><%= new Date(s.created_at).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) %></td>
+            <td>
+              <a href="/admin/transactions/<%= s.id %>/delete<%= q ? ('?q=' + encodeURIComponent(q)) : '' %>" class="btn btn-sm" style="background:#d9534f; border-color:#d9534f; width:auto;" onclick="return confirm('Hapus pesanan #<%= s.id %>?')">Delete</a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>
+

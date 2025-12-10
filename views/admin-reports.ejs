@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Reports</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="/images/logo.png" type="image/png" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo">SPICE DUMS</div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/admin/reports">Reports</a>
+      <a href="/admin/products">Products</a>
+      <a href="/admin/transactions">Transactions</a>
+    </nav>
+    <div class="auth">
+      <% if (user) { %>
+        <span>Hi <%= user.username %> <span class="badge">ADMIN</span></span>
+        <form method="post" action="/logout" style="display:inline"><button type="submit" class="btn" style="padding:8px 14px; margin-top:0;">Logout</button></form>
+      <% } %>
+    </div>
+  </header>
+  <main class="container">
+    <h2>Report Penjualan</h2>
+    <form method="get" style="margin: 12px 0; display: flex; gap: 8px; align-items: center;">
+      <label for="fromDate" class="label">Dari:</label>
+      <input id="fromDate" name="from" type="date" class="input" style="padding:8px 12px;" value="<%= from %>" />
+      <label for="toDate" class="label">Sampai:</label>
+      <input id="toDate" name="to" type="date" class="input" style="padding:8px 12px;" value="<%= to %>" />
+      <button type="submit" class="btn">Terapkan</button>
+    </form>
+
+    <section class="section">
+      <div class="grid stats-grid">
+        <div class="card stat-card">
+          <div class="label">Omset</div>
+          <div id="kpiRevenue" class="value">Rp <%= Number(kpi.revenue || 0).toLocaleString('id-ID') %></div>
+        </div>
+        <div class="card stat-card">
+          <div class="label">Total Orders</div>
+          <div id="kpiOrders" class="value"><%= Number(kpi.ordersCount || 0).toLocaleString('id-ID') %></div>
+        </div>
+        <div class="card stat-card">
+          <div class="label">Avg Order Value</div>
+          <div id="kpiAov" class="value">Rp <%= Number(kpi.aov || 0).toLocaleString('id-ID') %></div>
+        </div>
+        <div class="card stat-card">
+          <div class="label">Laba</div>
+          <div id="kpiProfit" class="value">Rp <%= Number(kpi.profit || 0).toLocaleString('id-ID') %></div>
+        </div>
+        
+        <div class="card stat-card">
+          <div class="label">Reviews</div>
+          <div class="value"><%= Number(reviews.overall.avg_rating || 0).toFixed(1) %>/5 (<%= reviews.overall.count || 0 %>)</div>
+        </div>
+        <% if ((kpi.revenue || 0) > 0 && (kpi.cost || 0) === 0) { %>
+        <div class="card stat-card" style="background:#fff3cd; color:#664d03;">
+          <div class="label">Informasi HPP</div>
+          <div class="sub">Isi HPP pada produk agar laba bersih dapat dihitung.</div>
+        </div>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="section">
+      <h3 class="section-title">Transaksi per User</h3>
+      <table class="report-table">
+        <thead><tr><th>User</th><th>Orders</th><th>Revenue</th></tr></thead>
+        <tbody>
+          <% salesByUser.forEach(row => { %>
+            <tr>
+              <td><%= row.username %></td>
+              <td><%= row.orders %></td>
+              <td>Rp <%= Number(row.revenue).toLocaleString('id-ID') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+
+    
+
+    <section class="section">
+      <h3 class="section-title">Transaksi per Hari</h3>
+      <table class="report-table">
+        <thead><tr><th><%= groupHeader %></th><th>Orders</th><th>Revenue</th></tr></thead>
+        <tbody>
+          <% (dailyDays || []).forEach(d => { %>
+            <tr>
+              <td>
+                <% if (period === 'day') { %>
+                  <%= new Date(d.day).toLocaleTimeString('id-ID', { hour: '2-digit' }) %>
+                <% } else if (period === 'year') { %>
+                  <%= d.day %>
+                <% } else { %>
+                  <%= new Date(d.day).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) %>
+                <% } %>
+              </td>
+              <td><%= Number(d.count || 0) %></td>
+              <td>Rp <%= Number(d.revenue || 0).toLocaleString('id-ID') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h3 class="section-title">Transaksi per Produk</h3>
+      <table class="report-table">
+        <thead><tr><th>Produk</th><th>Qty</th><th>Revenue</th></tr></thead>
+        <tbody>
+          <% (salesByProduct || []).forEach(row => { %>
+            <tr>
+              <td><%= row.product_name %></td>
+              <td><%= Number(row.qty || 0) %></td>
+              <td>Rp <%= Number(row.revenue || 0).toLocaleString('id-ID') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+    <script>
+      async function loadMetrics() {
+        const f = document.getElementById('fromDate');
+        const t = document.getElementById('toDate');
+        const fromV = f && f.value ? f.value : '';
+        const toV = t && t.value ? t.value : '';
+        const qs = new URLSearchParams({ from: fromV, to: toV });
+        const res = await fetch('/admin/reports/json?' + qs.toString(), { headers: { 'Accept': 'application/json' } });
+        const data = await res.json();
+        const rev = Number(data.kpi && data.kpi.revenue ? data.kpi.revenue : 0);
+        const ord = Number(data.kpi && data.kpi.ordersCount ? data.kpi.ordersCount : 0);
+        const aov = Number(data.kpi && data.kpi.aov ? data.kpi.aov : 0);
+        const profit = Number(data.kpi && data.kpi.profit ? data.kpi.profit : 0);
+        const cost = Number(data.kpi && data.kpi.cost ? data.kpi.cost : 0);
+        const labelSpan = document.getElementById('periodLabelSpan');
+        if (labelSpan) labelSpan.textContent = 'Menampilkan: ' + (data.periodLabel || '');
+        const kRev = document.getElementById('kpiRevenue');
+        const kOrd = document.getElementById('kpiOrders');
+        const kAov = document.getElementById('kpiAov');
+        const kProfit = document.getElementById('kpiProfit');
+        const kCost = document.getElementById('kpiCost');
+        if (kRev) kRev.textContent = 'Rp ' + rev.toLocaleString('id-ID');
+        if (kOrd) kOrd.textContent = ord.toLocaleString('id-ID');
+        if (kAov) kAov.textContent = 'Rp ' + aov.toLocaleString('id-ID');
+        if (kProfit) kProfit.textContent = 'Rp ' + profit.toLocaleString('id-ID');
+        if (kCost) kCost.textContent = 'HPP: Rp ' + cost.toLocaleString('id-ID');
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        const f = document.getElementById('fromDate');
+        const t = document.getElementById('toDate');
+        if (f) f.addEventListener('change', loadMetrics);
+        if (t) t.addEventListener('change', loadMetrics);
+        loadMetrics();
+        setInterval(loadMetrics, 10000);
+      });
+    </script>
+  </main>
+</body>
+</html>

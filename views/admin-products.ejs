@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Manage Products</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="/images/logo.png" type="image/png" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo">SPICE DUMS</div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/admin/reports">Reports</a>
+      <a href="/admin/products">Products</a>
+      <a href="/admin/transactions">Transactions</a>
+    </nav>
+    <div class="auth">
+      <% if (user) { %>
+        <span>Hi <%= user.username %> <span class="badge">ADMIN</span></span>
+        <form method="post" action="/logout" style="display:inline"><button type="submit" class="btn" style="padding:8px 14px; margin-top:0;">Logout</button></form>
+      <% } %>
+    </div>
+  </header>
+  <main class="container">
+    <h2 class="section-title" style="text-align:left;">Manage Products</h2>
+
+    <section class="card" style="margin-bottom:24px;">
+      <div class="admin-products-toolbar" style="display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+        <div style="flex:1; min-width:240px;">
+          <input id="productSearch" placeholder="Search products..." />
+        </div>
+        <div style="font-weight:600; color:var(--light)">Total: <%= products.length %></div>
+      </div>
+      <h3 style="margin-top:24px;">Add New Product</h3>
+      <form method="post" action="/admin/products/add" class="form-grid" enctype="multipart/form-data">
+        <div>
+          <label>Name</label>
+          <input name="name" required />
+        </div>
+        <div>
+          <label>Description</label>
+          <input name="description" />
+        </div>
+        <div>
+          <label>Price</label>
+          <input name="price" type="number" step="0.01" required />
+        </div>
+        <div>
+          <label>HPP (Cost)</label>
+          <input name="cost" type="number" step="0.01" />
+        </div>
+        <div>
+          <label>Image</label>
+          <input name="image_file" type="file" accept="image/*" />
+        </div>
+        <button class="btn" type="submit" style="max-width:260px;">Add Product</button>
+      </form>
+    </section>
+
+    <section>
+      <div class="admin-products-grid">
+        <% products.forEach(p => { %>
+          <article class="admin-product-card" data-name="<%= p.name %>" data-price="<%= p.price %>">
+            <img src="<%= p.imageResolved || '/images/placeholder.png' %>" alt="<%= p.name %>" />
+            <div class="admin-product-info">
+              <h3><%= p.name %></h3>
+              <div class="price">Rp <%= Number(p.price).toLocaleString('id-ID') %></div>
+            </div>
+            <div class="admin-actions">
+              <details>
+                <summary class="btn btn-sm" style="display:inline-block; width:auto;">Edit</summary>
+                <form method="post" action="/admin/products/<%= p.id %>/edit" class="form-grid" style="margin-top:12px;" enctype="multipart/form-data">
+                  <div>
+                    <label>Name</label>
+                    <input name="name" value="<%= p.name %>" />
+                  </div>
+                  <div>
+                    <label>Description</label>
+                    <input name="description" value="<%= p.description %>" />
+                  </div>
+                  <div>
+                    <label>Price</label>
+                    <input name="price" type="number" step="0.01" value="<%= p.price %>" />
+                  </div>
+                  <div>
+                    <label>HPP (Cost)</label>
+                    <input name="cost" type="number" step="0.01" value="<%= typeof p.cost !== 'undefined' ? Number(p.cost) : 0 %>" />
+                  </div>
+                  <div>
+                    <label>Image</label>
+                    <input name="image_file" type="file" accept="image/*" />
+                  </div>
+                  <button class="btn btn-sm" type="submit" style="width:auto;">Save</button>
+                </form>
+              </details>
+              <form method="post" action="/admin/products/<%= p.id %>/delete">
+                <button class="btn btn-sm" type="submit" style="background:#d9534f; border-color:#d9534f; width:auto;">Delete</button>
+              </form>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('productSearch');
+        const cards = Array.from(document.querySelectorAll('.admin-product-card'));
+        function filter() {
+          const q = (input.value || '').toLowerCase();
+          cards.forEach(c => {
+            const name = (c.getAttribute('data-name') || '').toLowerCase();
+            const price = (c.getAttribute('data-price') || '').toLowerCase();
+            c.style.display = name.includes(q) || price.includes(q) ? '' : 'none';
+          });
+        }
+        input.addEventListener('input', filter);
+      });
+    </script>
+  </main>
+</body>
+</html>
