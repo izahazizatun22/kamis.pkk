@@ -625,3 +625,90 @@ app.post('/cart/checkout', async (req, res) => {
     res.redirect(wa);
   }
 });
+
+app.post('/admin/products/:id/delete', async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
+  const { id } = req.params;
+  if (!id) return res.status(400).send('Invalid product id');
+  await db.query('DELETE FROM products WHERE id = ?', [id]);
+  res.redirect('/admin/products');
+});
+
+app.post('/admin/orders/:id/delete', async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
+  const { id } = req.params;
+  if (!id) return res.status(400).send('Invalid order id');
+  await db.query('DELETE FROM orders WHERE id = ?', [id]);
+  res.redirect('/admin/reports');
+});
+
+// Fallback GET route to support deletion via link
+app.get('/admin/orders/:id/delete', async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
+  const { id } = req.params;
+  if (!id) return res.status(400).send('Invalid order id');
+  await db.query('DELETE FROM orders WHERE id = ?', [id]);
+  res.redirect('/admin/reports');
+});
+
+// Admin - Transactions page
+app.get('/admin/transactions', async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
+  const q = String(req.query.q || '').trim();
+  let sql = 'SELECT DISTINCT o.id, o.total, COALESCE(u.username, "Guest") AS username, o.created_at FROM orders o LEFT JOIN users u ON o.user_id = u.id LEFT JOIN order_items oi ON oi.order_id = o.id LEFT JOIN products p ON p.id = oi.product_id';
+  const params = [];
+  if (q) {
+    sql += ' WHERE (CAST(o.id AS CHAR) LIKE ? OR COALESCE(u.username, "Guest") LIKE ? OR p.name LIKE ?)';
+    params.push('%' + q + '%', '%' + q + '%', '%' + q + '%');
+  }
+  sql += ' ORDER BY o.created_at DESC LIMIT 200';
+  const [sales] = await db.query(sql, params);
+  const ids = sales.map(s => s.id);
+  const [itemsRows] = ids.length ? await db.query('SELECT oi.order_id, oi.product_id, oi.qty, oi.price, COALESCE(oi.cost, p.cost) AS cost, COALESCE(p.name, "Produk") AS name FROM order_items oi LEFT JOIN products p ON oi.product_id = p.id WHERE oi.order_id IN (' + ids.map(() => '?').join(',') + ')', ids) : [[]];
+  const itemsByOrderId = new Map();
+  for (const r of itemsRows) {
+    const arr = itemsByOrderId.get(r.order_id) || [];
+    arr.push({ product_id: r.product_id, name: r.name, qty: Number(r.qty), price: Number(r.price) });
+    itemsByOrderId.set(r.order_id, arr);
+  }
+  const salesDetailed = sales.map(s => ({ ...s, items: itemsByOrderId.get(s.id) || [] }));
+  res.render('admin-transactions', { sales: salesDetailed, q });
+});
+
+app.get('/admin/transactions/:id/delete', async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).send('Forbidden');
+  const { id } = req.params;
+  if (!id) return res.status(400).send('Invalid order id');
+  await db.query('DELETE FROM orders WHERE id = ?', [id]);
+  const q = typeof req.query.q === 'string' ? req.query.q : '';
+  return res.redirect('/admin/transactions' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+});
+
+const server = app.listen(PORT, () => console.log('Server running on http://localhost:' + PORT));
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    const fallback = PORT + 1;
+    app.listen(fallback, () => console.log('Server running on http://localhost:' + fallback));
+  } else {
+    throw err;
+  }
+});
+app.get('/cart/json', (req, res) => {
+  const items = req.session.cart || [];
+  const resolvePath = (img) => {
+    const placeholder = '/images/placeholder.png';
+    if (!img || typeof img !== 'string') return placeholder;
+    const normalized = img.startsWith('/') ? img : ('/' + img);
+    const candidate = path.join(__dirname, 'public', normalized.replace(/^\//, ''));
+    if (fs.existsSync(candidate)) return normalized;
+    if (normalized.startsWith('/images/')) {
+      const base = path.basename(normalized);
+      const alt = path.join(__dirname, 'public', 'uploads', base);
+      if (fs.existsSync(alt)) return '/uploads/' + base;
+    }
+    return placeholder;
+  };
+  const itemsResolved = items.map(it => ({ ...it, image: resolvePath(it.image) }));
+  const total = itemsResolved.reduce((sum, it) => sum + (it.price * it.qty), 0);
+  res.json({ items: itemsResolved, total, cartCount: itemsResolved.reduce((a,b)=>a+(b.qty||0),0) });
+});
