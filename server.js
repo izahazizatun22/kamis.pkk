@@ -500,3 +500,128 @@ app.post('/admin/products/:id/edit', upload.single('image_file'), async (req, re
   res.redirect('/admin/products');
 });
 
+// Cart
+app.get('/cart', async (req, res) => {
+  const items = req.session.cart || [];
+  const total = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+  const wantsJson = (req.headers['accept'] || '').includes('application/json');
+  if (wantsJson) return res.json({ items, total });
+  res.redirect('/');
+});
+
+app.post('/cart/add', async (req, res) => {
+  const { product_id, qty } = req.body;
+  const pid = parseInt(product_id, 10);
+  const quantity = Math.max(1, parseInt(qty, 10) || 1);
+  const [rows] = await db.query('SELECT id, name, price, image FROM products WHERE id = ?', [pid]);
+  const p = rows[0];
+  if (!p) return res.redirect('/');
+  const resolvePath = (img) => {
+    const placeholder = '/images/placeholder.png';
+    if (!img || typeof img !== 'string') return placeholder;
+    const normalized = img.startsWith('/') ? img : ('/' + img);
+    const candidate = path.join(__dirname, 'public', normalized.replace(/^\//, ''));
+    if (fs.existsSync(candidate)) return normalized;
+    if (normalized.startsWith('/images/')) {
+      const base = path.basename(normalized);
+      const alt = path.join(__dirname, 'public', 'uploads', base);
+      if (fs.existsSync(alt)) return '/uploads/' + base;
+    }
+    return placeholder;
+  };
+  const existing = (req.session.cart || []).find(it => it.product_id === pid);
+  if (existing) {
+    existing.qty += quantity;
+  } else {
+    req.session.cart.push({ product_id: p.id, name: p.name, price: Number(p.price), image: resolvePath(p.image), qty: quantity });
+  }
+  const items = req.session.cart || [];
+  const total = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+  const wantsJson = (req.headers['accept'] || '').includes('application/json');
+  if (wantsJson) {
+    return res.json({ items, total, cartCount: items.reduce((a,b)=>a+(b.qty||0),0) });
+  }
+  res.redirect('/cart');
+});
+
+app.post('/cart/update', (req, res) => {
+  const { product_id, qty } = req.body;
+  const pid = parseInt(product_id, 10);
+  const quantity = Math.max(0, parseInt(qty, 10) || 0);
+  req.session.cart = (req.session.cart || []).map(it => it.product_id === pid ? { ...it, qty: quantity } : it).filter(it => it.qty > 0);
+  const items = req.session.cart || [];
+  const total = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+  const wantsJson = (req.headers['accept'] || '').includes('application/json');
+  if (wantsJson) {
+    return res.json({ items, total, cartCount: items.reduce((a,b)=>a+(b.qty||0),0) });
+  }
+  res.redirect('/cart');
+});
+
+app.post('/cart/remove', (req, res) => {
+  const { product_id } = req.body;
+  const pid = parseInt(product_id, 10);
+  req.session.cart = (req.session.cart || []).filter(it => it.product_id !== pid);
+  const items = req.session.cart || [];
+  const total = items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+  const wantsJson = (req.headers['accept'] || '').includes('application/json');
+  if (wantsJson) {
+    return res.json({ items, total, cartCount: items.reduce((a,b)=>a+(b.qty||0),0) });
+  }
+  res.redirect('/cart');
+});
+
+app.post('/cart/clear', (req, res) => {
+  req.session.cart = [];
+  const wantsJson = (req.headers['accept'] || '').includes('application/json');
+  if (wantsJson) {
+    return res.json({ items: [], total: 0, cartCount: 0 });
+  }
+  res.redirect('/cart');
+});
+
+app.post('/cart/checkout', async (req, res) => {
+  const cart = req.session.cart || [];
+  if (!cart.length) {
+    const wantsJson = (req.headers['accept'] || '').includes('application/json');
+    if (wantsJson) {
+      return res.status(400).json({ error: 'Cart is empty' });
+    }
+    return res.redirect('/');
+  }
+
+  const ids = cart.map(it => it.product_id);
+  const [rows] = ids.length ? await db.query('SELECT id, price, name, cost FROM products WHERE id IN (' + ids.map(() => '?').join(',') + ')', ids) : [[]];
+  const priceMap = new Map(rows.map(r => [r.id, Number(r.price)]));
+  const nameMap = new Map(rows.map(r => [r.id, r.name]));
+  const costMap = new Map(rows.map(r => [r.id, Number(r.cost || 0)]));
+  const total = cart.reduce((sum, it) => sum + ((priceMap.get(it.product_id) || it.price) * it.qty), 0);
+
+  await db.query('CREATE TABLE IF NOT EXISTS orders (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NULL, total DECIMAL(10,2) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+  await db.query('CREATE TABLE IF NOT EXISTS order_items (id INT AUTO_INCREMENT PRIMARY KEY, order_id INT NOT NULL, product_id INT NOT NULL, qty INT NOT NULL, price DECIMAL(10,2) NOT NULL, cost DECIMAL(10,2) NOT NULL DEFAULT 0, FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE)');
+  await db.query('INSERT INTO orders (user_id, total) VALUES (?, ?)', [req.session.user ? req.session.user.id : null, total]);
+  const [[orderRow]] = await db.query('SELECT LAST_INSERT_ID() AS id');
+  const orderId = orderRow.id;
+  for (const it of cart) {
+    const price = priceMap.get(it.product_id) || it.price;
+    const cost = costMap.get(it.product_id) || 0;
+    await db.query('INSERT INTO order_items (order_id, product_id, qty, price, cost) VALUES (?, ?, ?, ?, ?)', [orderId, it.product_id, it.qty, price, cost]);
+  }
+
+  req.session.cart = [];
+
+  const wantsJson = (req.headers['accept'] || '').includes('application/json');
+  if (wantsJson) {
+    res.json({ success: true, total: Number(total), orderId });
+  } else {
+    const lines = cart.map(it => {
+      const nm = nameMap.get(it.product_id) || it.name || 'Produk';
+      const price = priceMap.get(it.product_id) || it.price || 0;
+      return `- ${nm} x${it.qty} @ Rp ${Number(price).toLocaleString('id-ID')}`;
+    }).join('\n');
+    const userLine = req.session.user ? `Saya ${req.session.user.username}.` : '';
+    const message = `Halo Spice Dums. ${userLine}\nID Pesanan: #${orderId}\nOrder:\n${lines}\nSubtotal: Rp ${Number(total).toLocaleString('id-ID')}\nMohon konfirmasi.`;
+    const wa = 'https://wa.me/6285775211374?text=' + encodeURIComponent(message);
+    res.redirect(wa);
+  }
+});
