@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Register - Spice Dums</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="/images/logo.png" type="image/png" />
+</head>
+<body class="auth-page">
+  <div class="auth-card">
+    <div class="auth-back"><a href="/#menu">← Kembali ke Menu</a></div>
+    <img src="/images/logo.png" alt="logo" class="logo-img" />
+    <h2>DAFTAR</h2>
+    <p>Buat akun untuk memesan dan memberikan review.</p>
+    <form method="post" action="/register">
+      <label>Username</label>
+      <input name="username" placeholder="Pilih username" autocomplete="username" required />
+      <label>Email</label>
+      <input name="email" type="email" placeholder="email@contoh.com" autocomplete="email" required />
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Buat password" autocomplete="new-password" required />
+      <button type="submit" class="btn">Daftar</button>
+    </form>
+    <div class="auth-switch">Sudah punya akun? <a href="/login">Login</a></div>
+  </div>
+</body>
+</html>
