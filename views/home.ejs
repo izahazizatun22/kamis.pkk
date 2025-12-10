@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spice Dums - Home</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="/images/logo.png" type="image/png" />
+  <style>
+    html {
+      scroll-behavior: smooth;
+    }
+  </style>
+  </head>
+<body>
+  <header class="site-header">
+    <div class="logo">SPICE DUMS</div>
+    <nav>
+      <% if (user && user.role === 'admin') { %>
+        <a href="/">Dashboard</a>
+        <a href="/admin/reports">Reports</a>
+        <a href="/admin/products">Products</a>
+        <a href="/admin/transactions">Transactions</a>
+      <% } else { %>
+        <a href="#">Home</a>
+        <a href="#social">Social Media</a>
+        <a href="#menu">Menu</a>
+        <a href="#review">Review</a>
+      <% } %>
+    </nav>
+    <div class="auth">
+      <% if (!user) { %>
+        <a href="/login">Login</a> | <a href="/register">Register</a>
+        <button type="button" id="cartButton" class="cart-button">🛒<span id="cartCount" class="cart-count"><%= cartCount %></span></button>
+      <% } else { %>
+        <span>Hi <%= user.username %> <% if (user.role === 'admin') { %><span class="badge">ADMIN</span><% } %></span>
+        <button type="button" id="cartButton" class="cart-button">🛒<span id="cartCount" class="cart-count"><%= cartCount %></span></button>
+        <form method="post" action="/logout" style="display:inline"><button type="submit" class="btn">Logout</button></form>
+      <% } %>
+    </div>
+  </header>
+
+  <main class="container">
+    <% if (user && user.role === 'admin') { %>
+      <!-- Admin Dashboard -->
+      <section class="hero" id="home">
+        <div class="hero-left">
+          <h1>Welcome Admin</h1>
+          <p>You have admin access. Manage your business from here.</p>
+          <a href="/admin/reports" class="btn">View Reports</a>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">Admin Panel</h2>
+        <div class="grid">
+          <div class="card" style="text-align:center;">
+            <div style="font-size: 28px; font-weight: 900; color: var(--primary);">📊</div>
+            <h3 style="margin: 12px 0;">Reports</h3>
+            <a href="/admin/reports" style="color: var(--primary); text-decoration: none; font-weight: 600;">View Sales Reports</a>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="font-size: 28px; font-weight: 900; color: var(--primary);">📦</div>
+            <h3 style="margin: 12px 0;">Products</h3>
+            <a href="/admin/products" style="color: var(--primary); text-decoration: none; font-weight: 600;">Manage Products</a>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="font-size: 28px; font-weight: 900; color: var(--primary);">🧾</div>
+            <h3 style="margin: 12px 0;">Transactions</h3>
+            <a href="/admin/transactions" style="color: var(--primary); text-decoration: none; font-weight: 600;">View All Transactions</a>
+          </div>
+        </div>
+      </section>
+    <% } else { %>
+      <!-- Customer View -->
+      <section class="hero" id="home">
+        <div class="hero-left">
+          <h1>SPICE DUMS</h1>
+          <p>Spice Dums! Kami adalah mesin waktu yang membawa Anda menikmati kelezatan pangsit goreng dan oreo goreng dengan sentuhan klasik.</p>
+        </div>
+        <div class="hero-right">
+          <img src="/images/logo.png" alt="Gambar Produk" class="product-image" />
+        </div>
+      </section>
+
+      <section class="menu-grid" id="menu">
+        <% products.forEach(p => { %>
+          <a href="/product/<%= p.id %>" class="product-card" style="text-decoration:none; color:inherit;">
+            <img src="<%= p.imageResolved || '/images/placeholder.png' %>" alt="<%= p.name %>" />
+            <div class="product-card-content">
+              <h3 class="product-card-title"><%= p.name %></h3>
+              <div class="price">Rp <%= Number(p.price).toLocaleString('id-ID') %></div>
+            </div>
+            <button type="button" class="add-to-cart-btn" data-id="<%= p.id %>">+</button>
+          </a>
+        <% }) %>
+      </section>
+
+      <section id="social" class="section container">
+        <h2 class="section-title">SOCIAL MEDIA</h2>
+        <div class="social-icons">
+          <a href="https://www.facebook.com/share/17uQGcpLFp/?mibextid=wwXIfr" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://www.instagram.com/spice.dums?igsh=MTB6NnZ1c3g2aWt0bg==" target="_blank" rel="noopener">Instagram</a>
+          <a href="https://x.com/spice_dums?s=21" target="_blank" rel="noopener">X</a>
+          <a href="https://youtube.com/@spicedamsss?si=O2gL6mqLjXvMRvwh" target="_blank" rel="noopener">Youtube</a>
+          <a href="https://www.tiktok.com/@dump.spice06?_t=ZS-8zodjGw37qB&_r=1" target="_blank" rel="noopener">Tiktok</a>
+        </div>
+      </section>
+
+      <section id="review" class="section container">
+        <h2 class="section-title">Customer Reviews</h2>
+        <div class="reviews-marquee">
+          <div class="marquee-track" style="--marquee-duration: 30s;">
+            <% reviews.forEach((r) => { %>
+              <div class="marquee-item">
+                <div class="review-card-small">
+                  <div class="review-card-small-header">
+                    <div class="review-card-small-name"><%= r.username %></div>
+                    <div class="review-card-small-stars">
+                      <% for(let i = 0; i < r.rating; i++) { %>⭐<% } %>
+                    </div>
+                    <div class="review-card-small-sub"><%= r.rating %>/5</div>
+                  </div>
+                  <p class="review-card-small-quote">"<%= r.comment %>"</p>
+                </div>
+              </div>
+            <% }) %>
+            <% reviews.forEach((r) => { %>
+              <div class="marquee-item">
+                <div class="review-card-small">
+                  <div class="review-card-small-header">
+                    <div class="review-card-small-name"><%= r.username %></div>
+                    <div class="review-card-small-stars">
+                      <% for(let i = 0; i < r.rating; i++) { %>⭐<% } %>
+                    </div>
+                    <div class="review-card-small-sub"><%= r.rating %>/5</div>
+                  </div>
+                  <p class="review-card-small-quote">"<%= r.comment %>"</p>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      </section>
+
+      
+    <% } %>
+  </main>
+
+  <div class="cart-modal-backdrop" id="cartBackdrop">
+    <div class="cart-modal" id="cartModal">
+      <div class="cart-modal-header">
+        <h3 style="margin:0">Keranjang</h3>
+        <button class="cart-close" id="cartClose">✕</button>
+      </div>
+      <div class="cart-modal-content">
+        <div id="cartList"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+            <div id="cartTotal" style="font-weight:800; text-align:right;">Subtotal: Rp 0</div>
+            <form method="post" action="/cart/checkout" id="cartCheckoutForm" target="_blank"><button class="btn" type="submit" style="max-width:200px;">Checkout</button></form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">&copy; <%= new Date().getFullYear() %> Spice Dums</footer>
+  <script src="/js/carousel.js"></script>
+  <script>
+    const backdrop = document.getElementById('cartBackdrop');
+    const cartClose = document.getElementById('cartClose');
+    const cartList = document.getElementById('cartList');
+    const cartTotal = document.getElementById('cartTotal');
+    function openCart(){ backdrop.classList.add('cart-visible'); }
+    function closeCart(){ backdrop.classList.remove('cart-visible'); }
+    cartClose.addEventListener('click', closeCart);
+    backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeCart(); });
+    async function refreshCart(){
+      const res = await fetch('/cart/json');
+      const data = await res.json();
+      cartList.innerHTML = data.items.map(it => `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid #e8e8e8; padding:8px 0;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <img src="${it.image || '/images/placeholder.png'}" style="width:48px; height:48px; object-fit:cover; border-radius:8px;" />
+            <div>
+              <div style="font-weight:700;">${it.name}</div>
+              <div style="color:#808080;">Rp ${Number(it.price).toLocaleString('id-ID')}</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <form method="post" action="/cart/update" onsubmit="return submitAjax(event)">
+              <input type="hidden" name="product_id" value="${it.product_id}" />
+              <input name="qty" type="number" min="0" value="${it.qty}" style="width:70px;" onchange="this.form.dispatchEvent(new Event('submit', {cancelable:true}))" />
+            </form>
+            <form method="post" action="/cart/remove" onsubmit="return submitAjax(event)">
+              <input type="hidden" name="product_id" value="${it.product_id}" />
+              <button class="btn btn-sm" type="submit" style="background:#d9534f; border-color:#d9534f; width:auto;">Remove</button>
+            </form>
+          </div>
+        </div>
+      `).join('');
+      cartTotal.textContent = 'Subtotal: Rp ' + Number(data.total).toLocaleString('id-ID');
+      const c = document.getElementById('cartCount');
+      if (c) c.textContent = data.cartCount;
+    }
+    async function addToCart(id){
+      try{
+        const res = await fetch('/cart/add', { method:'POST', headers:{ 'Content-Type':'application/x-www-form-urlencoded', 'Accept':'application/json' }, body: new URLSearchParams({ product_id: id, qty: 1 }) });
+        if(res.ok){ await refreshCart(); }
+      } catch(err){ console.error(err); }
+    }
+    function submitAjax(e){
+      e.preventDefault();
+      const form = e.target;
+      const url = form.getAttribute('action');
+      const body = new URLSearchParams(new FormData(form));
+      fetch(url, { method:'POST', headers:{ 'Accept':'application/json' }, body }).then(r=>r.json()).then(()=>{ refreshCart(); });
+      return false;
+    }
+    document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+      btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); addToCart(btn.dataset.id); });
+    });
+    document.querySelectorAll('.product-card').forEach(card => {
+      card.addEventListener('click', (e)=>{ if (e.target.closest('.add-to-cart-btn')) { e.preventDefault(); } });
+    });
+    const cartBtn = document.getElementById('cartButton');
+    if (cartBtn) {
+      cartBtn.addEventListener('click', async (e) => { e.preventDefault(); await refreshCart(); openCart(); });
+    }
+    const checkoutForm = document.getElementById('cartCheckoutForm');
+    if (checkoutForm) {
+      checkoutForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const res = await fetch('/cart/json');
+        const data = await res.json();
+        const resCheckout = await fetch('/cart/checkout', { method: 'POST', headers: { 'Accept': 'application/json' } });
+        const checkoutData = await resCheckout.json();
+        const lines = (data.items || []).map(it => `- ${it.name} x${it.qty} @ Rp ${Number(it.price).toLocaleString('id-ID')}`).join('\n');
+        const message = `Halo Spice Dums.\nID Pesanan: #${checkoutData.orderId || ''}\nOrder:\n${lines}\nSubtotal: Rp ${Number(data.total).toLocaleString('id-ID')}\nMohon konfirmasi.`;
+        const wa = 'https://wa.me/6285775211374?text=' + encodeURIComponent(message);
+        window.open(wa, '_blank');
+        const firstId = (data.items && data.items[0] && data.items[0].product_id) ? data.items[0].product_id : null;
+        closeCart();
+        if (firstId) { window.location.href = '/product/' + firstId + '#reviews'; } else { window.location.href = '/#menu'; }
+      });
+    }
+  </script>
+</body>
+</html>
